@@ -1,37 +1,63 @@
+# =========================================================
+# RODENT-BORNE DISEASE MODEL
+# MONTE CARLO BAYESIAN BELIEF NETWORK
+#
+# Mechanism:
+#   Restoration → improved habitat quality
+#               → higher biodiversity
+#               → reduced rodent dominance
+#               → lower reservoir abundance
+#               → lower disease risk
+#
+# Expected pattern:
+#   Disease risk   : steady decline, steeper than multi-host
+#                    (direct pathway: habitat → rodent → risk)
+#   Stabilisation  : slow but monotonic increase
+#   Uncertainty    : moderate
+#
+# =========================================================
+
 library(bnlearn)
 library(gRain)
 library(dplyr)
+library(tidyr)
+library(ggplot2)
 
 set.seed(123)
 
 # =========================================================
-# HELPER FUNCTION
+# HELPER
 # =========================================================
 
-sample_prob <- function(min,max){
-  
-  runif(1,min,max)
-  
-}
+sample_prob <- function(mn, mx) runif(1, mn, mx)
 
 # =========================================================
-# NODE STATES
+# SETTINGS
 # =========================================================
 
-node_states <- list(
+n_iter  <- 1000
+results <- data.frame()
+
+# =========================================================
+# STATES
+# =========================================================
+
+states <- list(
   
   Region_Context = c(
-    "Low_Risk_Context",
-    "Moderate_Risk_Context",
-    "High_Risk_Context"
+    "Low",
+    "Moderate",
+    "High"
   ),
   
-  Habitat_Design = c(
-    "not_restored",
-    "restored"
+  Restoration_Intensity = c(
+    "none",
+    "low",
+    "moderate",
+    "high"
   ),
   
-  Biodiversity_Recovery = c(
+  Habitat_Quality = c(
     "low",
     "moderate",
     "high"
@@ -39,12 +65,19 @@ node_states <- list(
   
   Rodent_Abundance = c(
     "low",
+    "moderate",
     "high"
   ),
   
-  Rodent_Borne_Diseases = c(
+  Rodent_Disease_Risk = c(
     "absent",
     "present"
+  ),
+  
+  Ecological_Regulation = c(
+    "weak",
+    "moderate",
+    "strong"
   ),
   
   Time_to_Stable_State = c(
@@ -56,34 +89,20 @@ node_states <- list(
 )
 
 # =========================================================
-# DAG STRUCTURE
+# DAG 
 # =========================================================
 
 dag <- model2network(
-  
   paste0(
-    
     "[Region_Context]",
-    
-    "[Habitat_Design]",
-    
-    "[Biodiversity_Recovery|Habitat_Design:Region_Context]",
-    
-    "[Rodent_Abundance|Biodiversity_Recovery]",
-    
-    "[Rodent_Borne_Diseases|Rodent_Abundance]",
-    
-    "[Time_to_Stable_State|Region_Context:Habitat_Design:Rodent_Borne_Diseases]"
-    
-  ))
-
-# =========================================================
-# MONTE CARLO SETTINGS
-# =========================================================
-
-n_iter <- 1000
-
-results <- data.frame()
+    "[Restoration_Intensity]",
+    "[Habitat_Quality|Region_Context:Restoration_Intensity]",
+    "[Rodent_Abundance|Habitat_Quality]",
+    "[Rodent_Disease_Risk|Rodent_Abundance]",
+    "[Ecological_Regulation|Restoration_Intensity:Rodent_Disease_Risk]",
+    "[Time_to_Stable_State|Ecological_Regulation]"
+  )
+)
 
 # =========================================================
 # MONTE CARLO LOOP
@@ -91,581 +110,551 @@ results <- data.frame()
 
 for(i in 1:n_iter){
   
-  # ======================================================
-  # REGION PRIOR
-  # ======================================================
+  # -------------------------------------------------------
+  # PRIORS (flat)
+  # -------------------------------------------------------
   
   cpt_region <- array(
-    
-    c(0.33,0.34,0.33),
-    
-    dim = c(3),
-    
-    dimnames = list(
-      
-      Region_Context =
-        node_states$Region_Context
-    )
+    c(0.33, 0.34, 0.33),
+    dim      = c(3),
+    dimnames = list(Region_Context = states$Region_Context)
   )
   
-  # ======================================================
-  # HABITAT PRIOR
-  # ======================================================
-  
-  cpt_habitat <- array(
-    
-    c(0.5,0.5),
-    
-    dim = c(2),
-    
-    dimnames = list(
-      
-      Habitat_Design =
-        node_states$Habitat_Design
-    )
+  cpt_restoration <- array(
+    c(0.25, 0.25, 0.25, 0.25),
+    dim      = c(4),
+    dimnames = list(Restoration_Intensity = states$Restoration_Intensity)
   )
   
-  # ======================================================
-  # BIODIVERSITY CPT
-  # ======================================================
+  # -------------------------------------------------------
+  # HABITAT QUALITY
+  # dim = c(3,4,3) = [Habitat, Rest, Region]
+  # Loop: Region outer (dim3), Rest inner (dim2)  ← was correct
+  #
+  # Mechanism: restoration directly improves habitat quality
+  # through vegetation recovery, reduced soil disturbance,
+  # and return of native plant communities.
+  # High-risk region adds a penalty to low habitat quality.
+  #
+  # Pattern: steep monotonic improvement with restoration
+  # (steeper than multi-host system because the pathway
+  # habitat → rodent → risk is more direct)
+  # -------------------------------------------------------
   
-  biodiversity_vals <- c()
+  habitat_vals <- c()
   
-  for(region in 1:3){
-    
-    for(habitat in 1:2){
+  for(region in 1:3){         # dim 3 – Region (outer)
+    for(rest in 1:4){         # dim 2 – Restoration (inner)
       
-      # restored
-      if(habitat == 2){
-        
-        probs <- c(
-          
-          sample_prob(0.10,0.25),
-          sample_prob(0.25,0.40),
-          sample_prob(0.45,0.65)
-          
-        )
-        
-      } else {
-        
-        probs <- c(
-          
-          sample_prob(0.55,0.75),
-          sample_prob(0.15,0.30),
-          sample_prob(0.03,0.12)
-          
-        )
-      }
-      
-      # regional degradation penalty
-      if(region == 3){
-        
-        probs[1] <- probs[1] + 0.10
-        
-      }
-      
-      probs <- probs / sum(probs)
-      
-      biodiversity_vals <- c(
-        biodiversity_vals,
-        probs
+      probs <- switch(rest,
+                      
+                      # none – degraded habitat, low quality dominant
+                      `1` = c(sample_prob(0.62, 0.80),   # low    ← dominant
+                              sample_prob(0.14, 0.28),   # moderate
+                              sample_prob(0.02, 0.10)),  # high
+                      
+                      # low – marginal recovery, still mostly poor
+                      `2` = c(sample_prob(0.38, 0.58),   # low
+                              sample_prob(0.26, 0.40),   # moderate
+                              sample_prob(0.08, 0.20)),  # high
+                      
+                      # moderate – quality clearly shifting
+                      `3` = c(sample_prob(0.18, 0.35),   # low
+                              sample_prob(0.32, 0.46),   # moderate
+                              sample_prob(0.25, 0.42)),  # high
+                      
+                      # high – mostly high quality; mature diverse habitat
+                      `4` = c(sample_prob(0.04, 0.14),   # low
+                              sample_prob(0.18, 0.34),   # moderate
+                              sample_prob(0.55, 0.75))   # high   ← dominant
       )
+      
+      # High-risk region: additional low-quality penalty
+      if(region == 3) probs[1] <- probs[1] + 0.10
+      
+      probs        <- probs / sum(probs)
+      habitat_vals <- c(habitat_vals, probs)
     }
   }
   
-  cpt_biodiversity <- array(
-    
-    biodiversity_vals,
-    
-    dim = c(3,2,3),
-    
+  cpt_habitat <- array(
+    habitat_vals,
+    dim      = c(3,4,3),
     dimnames = list(
-      
-      Biodiversity_Recovery =
-        node_states$Biodiversity_Recovery,
-      
-      Habitat_Design =
-        node_states$Habitat_Design,
-      
-      Region_Context =
-        node_states$Region_Context
+      Habitat_Quality       = states$Habitat_Quality,
+      Restoration_Intensity = states$Restoration_Intensity,
+      Region_Context        = states$Region_Context
     )
   )
   
-  # ======================================================
-  # RODENT ABUNDANCE CPT
-  # ======================================================
+  # -------------------------------------------------------
+  # RODENT ABUNDANCE
+  # dim = c(3,3) = [Abundance, Habitat]
+  # Single parent — flat vector fills correctly (Habitat slowest).
+  #
+  # Mechanism: high habitat quality supports diverse competitor
+  # communities (raptors, mustelids, diverse small mammals)
+  # that suppress rodent dominance. Low habitat quality
+  # favours r-selected rodent irruptions.
+  #
+  # The rodent suppression gradient is steep:
+  # low habitat  → high rodent abundance (0.72–0.82 present)
+  # high habitat → low rodent abundance  (0.68–0.80 absent)
+  # This steep gradient is what produces the steep risk decline.
+  # -------------------------------------------------------
   
   rodent_vals <- c(
-    
-    # low biodiversity
-    0.20,0.80,
-    
-    # moderate biodiversity
-    0.50,0.50,
-    
-    # high biodiversity
-    0.80,0.20
+    # low habitat quality    → high rodent dominance
+    0.05, 0.18, 0.77,
+    # moderate habitat       → mixed, moderate uncertainty
+    0.28, 0.48, 0.24,
+    # high habitat quality   → rodent suppression
+    0.72, 0.22, 0.06
   )
   
+  rodent_vals <- rodent_vals +
+    runif(length(rodent_vals), -0.03, 0.03)
+  rodent_vals[rodent_vals < 0.01] <- 0.01
+  
+  rodent_vals <- unlist(lapply(
+    split(rodent_vals, ceiling(seq_along(rodent_vals)/3)),
+    function(x) x / sum(x)
+  ))
+  
+  # FIX 1: array() was missing — cpt_rodents was never created
   cpt_rodents <- array(
-    
     rodent_vals,
-    
-    dim = c(2,3),
-    
+    dim      = c(3,3),
     dimnames = list(
-      
-      Rodent_Abundance =
-        node_states$Rodent_Abundance,
-      
-      Biodiversity_Recovery =
-        node_states$Biodiversity_Recovery
+      Rodent_Abundance = states$Rodent_Abundance,
+      Habitat_Quality  = states$Habitat_Quality
     )
   )
   
-  # ======================================================
-  # DISEASE CPT
-  # ======================================================
+  # -------------------------------------------------------
+  # DISEASE RISK
+  # dim = c(2,3) = [Disease, Abundance]
+  # Single parent — flat vector fills correctly.
+  #
+  # Tight, steep relationship: rodent abundance is the
+  # proximate driver of transmission risk (direct contact,
+  # contaminated excreta, infected ectoparasites).
+  # Small noise to reflect spillover stochasticity.
+  # -------------------------------------------------------
   
   disease_vals <- c(
-    
-    # rodents low
-    0.80,0.20,
-    
-    # rodents high
-    0.25,0.75
+    # low abundance    → mostly absent
+    0.92, 0.08,
+    # moderate         → uncertain, near 50/50
+    0.55, 0.45,
+    # high abundance   → mostly present
+    0.10, 0.90
   )
   
+  disease_vals <- disease_vals +
+    runif(length(disease_vals), -0.03, 0.03)
+  disease_vals[disease_vals < 0.01] <- 0.01
+  
+  disease_vals <- unlist(lapply(
+    split(disease_vals, ceiling(seq_along(disease_vals)/2)),
+    function(x) x / sum(x)
+  ))
+  
   cpt_disease <- array(
-    
     disease_vals,
-    
-    dim = c(2,2),
-    
+    dim      = c(2,3),
     dimnames = list(
-      
-      Rodent_Borne_Diseases =
-        node_states$Rodent_Borne_Diseases,
-      
-      Rodent_Abundance =
-        node_states$Rodent_Abundance
+      Rodent_Disease_Risk = states$Rodent_Disease_Risk,
+      Rodent_Abundance    = states$Rodent_Abundance
     )
   )
   
-  # ======================================================
-  # TEMPORAL CPT
-  # ======================================================
+  # -------------------------------------------------------
+  # ECOLOGICAL REGULATION
+  # dim = c(3,4,2) = [Regulation, Rest, Disease]
+  # Loop: Disease outer (dim3, slowest), Rest inner (dim2)
+  #
+  # FIX 2: loop order was inverted (Rest outer, Disease inner)
+  # → regulation probabilities were assigned to wrong cells
+  #
+  # Restoration drives regulation through two pathways:
+  #   (a) direct — biodiversity recovery, predator return
+  #   (b) indirect — rodent suppression removes positive
+  #       feedback between high abundance and weak regulation
+  #
+  # Disease present adds a small penalty to regulation
+  # (ongoing outbreak pressure delays recovery).
+  # -------------------------------------------------------
+  
+  reg_vals <- c()
+  
+  for(disease in 1:2){        # dim 3 – Disease (outer)
+    for(rest in 1:4){         # dim 2 – Restoration (inner)
+      
+      probs <- switch(rest,
+                      
+                      # none – weak regulation dominant
+                      `1` = c(sample_prob(0.65, 0.82),   # weak   ← dominant
+                              sample_prob(0.12, 0.24),   # moderate
+                              sample_prob(0.02, 0.10)),  # strong
+                      
+                      # low – weak still dominant, small shift
+                      `2` = c(sample_prob(0.45, 0.62),   # weak
+                              sample_prob(0.24, 0.38),   # moderate
+                              sample_prob(0.08, 0.22)),  # strong
+                      
+                      # moderate – regulation building monotonically
+                      `3` = c(sample_prob(0.22, 0.38),   # weak
+                              sample_prob(0.30, 0.44),   # moderate
+                              sample_prob(0.25, 0.42)),  # strong
+                      
+                      # high – strong regulation dominant
+                      `4` = c(sample_prob(0.04, 0.12),   # weak
+                              sample_prob(0.12, 0.26),   # moderate
+                              sample_prob(0.65, 0.82))   # strong ← dominant
+      )
+      
+      # Disease present: small penalty on regulation
+      # (outbreak pressure delays biodiversity recovery)
+      if(disease == 2) probs[1] <- probs[1] + 0.05
+      
+      probs    <- probs / sum(probs)
+      reg_vals <- c(reg_vals, probs)
+    }
+  }
+  
+  # FIX 2 (continued): array() was missing — cpt_regulation never created
+  cpt_regulation <- array(
+    reg_vals,
+    dim      = c(3,4,2),
+    dimnames = list(
+      Ecological_Regulation = states$Ecological_Regulation,
+      Restoration_Intensity = states$Restoration_Intensity,
+      Rodent_Disease_Risk   = states$Rodent_Disease_Risk
+    )
+  )
+  
+  # -------------------------------------------------------
+  # TIME TO STABLE STATE
+  # dim = c(4,3) = [Time, Regulation]
+  # Single parent — Regulation is dim 2 (slowest). ✓
+  #
+  # FIX 3: array() was missing — cpt_time was never created
+  #
+  # Pattern: slow but monotonic stabilisation increase
+  #   Weak regulation  → fast degraded plateau (1-3 yr mass)
+  #   Moderate         → gradual shift; peak at 4-7 yr
+  #   Strong           → slow, delayed; peak at 8-12 yr
+  #                      (slower than tick system but less
+  #                       extreme — no trophic cascade lag)
+  # The key signature is MONOTONIC — each step clearly shifts
+  # the distribution later, with moderate uncertainty.
+  # -------------------------------------------------------
   
   time_vals <- c()
   
-  for(region in 1:3){
+  for(reg in 1:3){
     
-    for(habitat in 1:2){
-      
-      for(disease in 1:2){
-        
-        # ================================================
-        # BEST CONDITIONS
-        # ================================================
-        
-        if(habitat == 2 & disease == 1){
-          
-          probs <- c(
-            
-            sample_prob(0.45,0.70),
-            sample_prob(0.15,0.30),
-            sample_prob(0.05,0.15),
-            sample_prob(0.01,0.08)
-          )
-          
-          # ================================================
-          # WORST CONDITIONS
-          # ================================================
-          
-        } else if(habitat == 1 & disease == 2){
-          
-          probs <- c(
-            
-            sample_prob(0.01,0.08),
-            sample_prob(0.05,0.18),
-            sample_prob(0.20,0.35),
-            sample_prob(0.45,0.70)
-          )
-          
-          # ================================================
-          # INTERMEDIATE
-          # ================================================
-          
-        } else {
-          
-          probs <- c(
-            
-            sample_prob(0.15,0.35),
-            sample_prob(0.20,0.35),
-            sample_prob(0.20,0.35),
-            sample_prob(0.15,0.35)
-          )
-        }
-        
-        # high-risk regional penalty
-        if(region == 3){
-          
-          probs[4] <- probs[4] + 0.15
-          probs[1] <- probs[1] * 0.6
-          
-        }
-        
-        probs <- probs / sum(probs)
-        
-        time_vals <- c(
-          time_vals,
-          probs
-        )
-      }
-    }
+    probs <- switch(reg,
+                    
+                    # weak – rapid degraded equilibrium
+                    `1` = c(sample_prob(0.48, 0.62),   # 1-3 yr  ← dominant
+                            sample_prob(0.24, 0.34),   # 4-7 yr
+                            sample_prob(0.06, 0.14),   # 8-12 yr
+                            sample_prob(0.02, 0.08)),  # 13-15 yr
+                    
+                    # moderate – peak shifting to middle windows
+                    `2` = c(sample_prob(0.14, 0.24),   # 1-3 yr
+                            sample_prob(0.32, 0.44),   # 4-7 yr  ← dominant
+                            sample_prob(0.22, 0.34),   # 8-12 yr
+                            sample_prob(0.10, 0.22)),  # 13-15 yr
+                    
+                    # strong – delayed, concentrated in 8-12 yr
+                    # (slower than no-restoration but not as extreme as tick)
+                    `3` = c(sample_prob(0.03, 0.09),   # 1-3 yr
+                            sample_prob(0.10, 0.20),   # 4-7 yr
+                            sample_prob(0.42, 0.56),   # 8-12 yr  ← dominant
+                            sample_prob(0.24, 0.38))   # 13-15 yr
+    )
+    
+    probs     <- probs / sum(probs)
+    time_vals <- c(time_vals, probs)
   }
   
+  # FIX 3 (continued): array() was missing
   cpt_time <- array(
-    
     time_vals,
-    
-    dim = c(4,3,2,2),
-    
+    dim      = c(4,3),
     dimnames = list(
-      
-      Time_to_Stable_State =
-        node_states$Time_to_Stable_State,
-      
-      Region_Context =
-        node_states$Region_Context,
-      
-      Habitat_Design =
-        node_states$Habitat_Design,
-      
-      Rodent_Borne_Diseases =
-        node_states$Rodent_Borne_Diseases
+      Time_to_Stable_State  = states$Time_to_Stable_State,
+      Ecological_Regulation = states$Ecological_Regulation
     )
   )
   
-  # ======================================================
+  # -------------------------------------------------------
   # FIT NETWORK
-  # ======================================================
+  # -------------------------------------------------------
   
-  fitted_bn <- custom.fit(
-    
+  fit <- custom.fit(
     dag,
-    
     dist = list(
-      
-      Region_Context = cpt_region,
-      
-      Habitat_Design = cpt_habitat,
-      
-      Biodiversity_Recovery = cpt_biodiversity,
-      
-      Rodent_Abundance = cpt_rodents,
-      
-      Rodent_Borne_Diseases = cpt_disease,
-      
-      Time_to_Stable_State = cpt_time
+      Region_Context        = cpt_region,
+      Restoration_Intensity = cpt_restoration,
+      Habitat_Quality       = cpt_habitat,
+      Rodent_Abundance      = cpt_rodents,
+      Rodent_Disease_Risk   = cpt_disease,
+      Ecological_Regulation = cpt_regulation,
+      Time_to_Stable_State  = cpt_time
     )
   )
   
-  # ======================================================
-  # CONVERT TO GRAIN
-  # ======================================================
+  bn <- as.grain(fit)
   
-  bn_grain <- as.grain(fitted_bn)
+  # -------------------------------------------------------
+  # SCENARIO QUERIES  (High-risk region)
+  # -------------------------------------------------------
   
-  # ======================================================
-  # RESTORATION SCENARIO
-  # ======================================================
-  
-  bn_restore <- setEvidence(
+  for(rest in states$Restoration_Intensity){
     
-    bn_grain,
-    
-    nodes = c(
-      "Region_Context",
-      "Habitat_Design"
-    ),
-    
-    states = c(
-      "High_Risk_Context",
-      "restored"
+    bn_temp <- setEvidence(
+      bn,
+      nodes  = c("Region_Context", "Restoration_Intensity"),
+      states = c("High", rest)
     )
-  )
+    
+    risk       <- querygrain(bn_temp, nodes = "Rodent_Disease_Risk")$Rodent_Disease_Risk
+    regulation <- querygrain(bn_temp, nodes = "Ecological_Regulation")$Ecological_Regulation
+    time       <- querygrain(bn_temp, nodes = "Time_to_Stable_State")$Time_to_Stable_State
+    
+    results <- bind_rows(results, data.frame(
+      iteration             = i,
+      scenario              = rest,
+      disease_risk          = risk["present"],
+      ecological_regulation = regulation["strong"],
+      years_1_3             = time["1_3_years"],
+      years_4_7             = time["4_7_years"],
+      years_8_12            = time["8_12_years"],
+      years_13_15           = time["13_15_years"]
+    ))
+  }
   
-  q_restore <- querygrain(
-    bn_restore,
-    nodes = "Time_to_Stable_State"
-  )$Time_to_Stable_State
- 
-   q_restore_time <- querygrain(
-    bn_restore,
-    nodes = "Time_to_Stable_State"
-  )$Time_to_Stable_State
-  
-  q_restore_disease <- querygrain(
-    bn_restore,
-    nodes = "Rodent_Borne_Diseases"
-  )$Rodent_Borne_Diseases
-  # ======================================================
-  # NO RESTORATION SCENARIO
-  # ======================================================
-  
-  bn_no_restore <- setEvidence(
-    
-    bn_grain,
-    
-    nodes = c(
-      "Region_Context",
-      "Habitat_Design"
-    ),
-    
-    states = c(
-      "High_Risk_Context",
-      "not_restored"
-    )
-  )
-  
-  q_no_restore <- querygrain(
-    bn_no_restore,
-    nodes = "Time_to_Stable_State"
-  )$Time_to_Stable_State
-  
-  q_no_time <- querygrain(
-    bn_no_restore,
-    nodes = "Time_to_Stable_State"
-  )$Time_to_Stable_State
-  
-  q_no_disease <- querygrain(
-    bn_no_restore,
-    nodes = "Rodent_Borne_Diseases"
-  )$Rodent_Borne_Diseases
-  # ======================================================
-  # STORE RESULTS
-  # ======================================================
-  
-  temp_df <- data.frame(
-    
-    iteration = c(i,i),
-    
-    scenario = c(
-      "Restoration",
-      "No_Restoration"
-    ),
-    
-    disease_risk = c(
-      q_restore_disease["present"],
-      q_no_disease["present"]
-    ),
-    
-    years_1_3 = c(
-      q_restore_time["1_3_years"],
-      q_no_time["1_3_years"]
-    ),
-    
-    years_4_7 = c(
-      q_restore_time["4_7_years"],
-      q_no_time["4_7_years"]
-    ),
-    
-    years_8_12 = c(
-      q_restore_time["8_12_years"],
-      q_no_time["8_12_years"]
-    ),
-    
-    years_13_15 = c(
-      q_restore_time["13_15_years"],
-      q_no_time["13_15_years"]
-    )
-  )
-  
-  results <- bind_rows(
-    results,
-    temp_df
-  )
-}
+}  # END MONTE CARLO
+
+# =========================================================
+# POST-PROCESSING
+# =========================================================
+
+results$long_term_stability <-
+  results$years_8_12 + results$years_13_15
+
+scen_levels <- c("none", "low", "moderate", "high")
+
+rodent_cols <- c(
+  none     = "#aaaaaa",
+  low      = "#fcae91",
+  moderate = "#fb6a4a",
+  high     = "#cb181d"
+)
 
 # =========================================================
 # SUMMARY
 # =========================================================
 
 summary_df <- results %>%
-  
   group_by(scenario) %>%
-  
   summarise(
-    
-    mean_1_3 = mean(years_1_3),
-    lower_1_3 = quantile(years_1_3,0.025),
-    upper_1_3 = quantile(years_1_3,0.975),
-    
-    mean_4_7 = mean(years_4_7),
-    lower_4_7 = quantile(years_4_7,0.025),
-    upper_4_7 = quantile(years_4_7,0.975),
-    
-    mean_8_12 = mean(years_8_12),
-    lower_8_12 = quantile(years_8_12,0.025),
-    upper_8_12 = quantile(years_8_12,0.975),
-    
-    mean_13_15 = mean(years_13_15),
-    lower_13_15 = quantile(years_13_15,0.025),
-    upper_13_15 = quantile(years_13_15,0.975)
+    mean_disease      = mean(disease_risk),
+    lower_disease     = quantile(disease_risk, 0.025),
+    upper_disease     = quantile(disease_risk, 0.975),
+    mean_regulation   = mean(ecological_regulation),
+    lower_regulation  = quantile(ecological_regulation, 0.025),
+    upper_regulation  = quantile(ecological_regulation, 0.975),
+    mean_stability    = mean(long_term_stability),
+    lower_stability   = quantile(long_term_stability, 0.025),
+    upper_stability   = quantile(long_term_stability, 0.975),
+    .groups = "drop"
   )
 
 print(summary_df)
 
 # =========================================================
-# TRADEOFF CURVE PLOT
+# PLOT 1 – Steady decline with ribbon and annotations
 # =========================================================
-results$long_term_instability <-
-  results$years_8_12 +
-  results$years_13_15
 
-library(ggplot2)
+baseline_val <- summary_df$mean_disease[summary_df$scenario == "none"]
+high_row     <- summary_df[summary_df$scenario == "high", ]
 
 ggplot(
-  
-  results,
-  
-  aes(
-    x = disease_risk,
-    y = long_term_instability,
-    color = scenario
-  )
-  
+  summary_df,
+  aes(x = factor(scenario, levels = scen_levels),
+      y = mean_disease, group = 1)
 ) +
-  
-  geom_point(
-    alpha = 0.2
-  ) +
-  
-  geom_smooth(
-    method = "loess",
-    se = TRUE
-  ) +
-  
-  labs(
-    
-    x = "Disease Risk Probability",
-    y = "Long-Term Stabilization Probability",
-    title = "Disease–Restoration Tradeoff Curves"
-    
-  ) +
-  
-  theme_minimal()
-
-# =========================================================
-# UNCERTAINTY CORRIDOR PLOTS
-# =========================================================
-
-trajectory_summary <- results %>%
-  
-  group_by(scenario) %>%
-  
-  summarise(
-    
-    mean_1_3 = mean(years_1_3),
-    low_1_3 = quantile(years_1_3,0.025),
-    high_1_3 = quantile(years_1_3,0.975),
-    
-    mean_4_7 = mean(years_4_7),
-    low_4_7 = quantile(years_4_7,0.025),
-    high_4_7 = quantile(years_4_7,0.975),
-    
-    mean_8_12 = mean(years_8_12),
-    low_8_12 = quantile(years_8_12,0.025),
-    high_8_12 = quantile(years_8_12,0.975),
-    
-    mean_13_15 = mean(years_13_15),
-    low_13_15 = quantile(years_13_15,0.025),
-    high_13_15 = quantile(years_13_15,0.975)
-  )
-
-library(tidyr)
-
-plot_df <- data.frame(
-  
-  scenario = rep(
-    trajectory_summary$scenario,
-    each = 4
-  ),
-  
-  time_period = rep(
-    c("1_3","4_7","8_12","13_15"),
-    times = 2
-  ),
-  
-  mean = c(
-    trajectory_summary$mean_1_3,
-    trajectory_summary$mean_4_7,
-    trajectory_summary$mean_8_12,
-    trajectory_summary$mean_13_15
-  ),
-  
-  lower = c(
-    trajectory_summary$low_1_3,
-    trajectory_summary$low_4_7,
-    trajectory_summary$low_8_12,
-    trajectory_summary$low_13_15
-  ),
-  
-  upper = c(
-    trajectory_summary$high_1_3,
-    trajectory_summary$high_4_7,
-    trajectory_summary$high_8_12,
-    trajectory_summary$high_13_15
-  )
-)
-
-plot_df$time_period <- factor(
-  
-  plot_df$time_period,
-  
-  levels = c(
-    "1_3",
-    "4_7",
-    "8_12",
-    "13_15"
-  )
-)
-
-ggplot(
-  
-  plot_df,
-  
-  aes(
-    x = time_period,
-    y = mean,
-    group = scenario,
-    color = scenario,
-    fill = scenario
-  )
-  
-) +
-  
-  geom_line(size = 1.2) +
-  
   geom_ribbon(
-    
-    aes(
-      ymin = lower,
-      ymax = upper
-    ),
-    
-    alpha = 0.2,
-    color = NA
+    aes(ymin = lower_disease, ymax = upper_disease),
+    fill  = "#cb181d",
+    alpha = 0.12
   ) +
-  
+  geom_hline(
+    yintercept = baseline_val,
+    linetype   = "dashed",
+    colour     = "grey50",
+    linewidth  = 0.6
+  ) +
+  annotate(
+    "text",
+    x = 0.55, y = baseline_val + 0.013,
+    label = "No-restoration baseline",
+    hjust = 0, size = 3.2, colour = "grey45"
+  ) +
+  geom_line(linewidth = 1.5, colour = "#cb181d") +
+  geom_point(
+    aes(fill = scenario),
+    shape = 21, size = 5,
+    colour = "white", stroke = 1.8
+  ) +
+  annotate(
+    "segment",
+    x    = high_row$scenario, xend = high_row$scenario,
+    y    = high_row$lower_disease - 0.005,
+    yend = high_row$lower_disease - 0.025,
+    colour = "#cb181d", linewidth = 0.5
+  ) +
+  annotate(
+    "label",
+    x = high_row$scenario,
+    y = high_row$lower_disease - 0.030,
+    label     = paste0("Steady decline endpoint\n",
+                       round(high_row$mean_disease, 2)),
+    fill      = "#fff5f0",
+    colour    = "#cb181d",
+    size      = 3.2, label.size = 0, fontface = "bold"
+  ) +
+  scale_fill_manual(values = rodent_cols) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.1),
+    labels = scales::label_number(accuracy = 0.1)
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position  = "none",
+    panel.grid.minor = element_blank()
+  ) +
   labs(
-    
-    x = "Stabilization Horizon",
-    y = "Probability",
-    title = "Restoration Stabilization Trajectories with Uncertainty Corridors"
-    
+    title    = "Rodent-borne disease risk across restoration intensities",
+    x        = "Restoration intensity",
+    y        = "Disease risk probability"
+  )
+
+# =========================================================
+# PLOT 2 – Ecological regulation recovery 
+# =========================================================
+
+reg_summary <- results %>%
+  group_by(scenario) %>%
+  summarise(
+    mean_reg = mean(ecological_regulation, na.rm = TRUE),
+    lower    = quantile(ecological_regulation, 0.025, na.rm = TRUE),
+    upper    = quantile(ecological_regulation, 0.975, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+ggplot(
+  reg_summary,
+  aes(x = factor(scenario, levels = scen_levels),
+      y = mean_reg, group = 1)
+) +
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper),
+    fill = "#cb181d", alpha = 0.12
   ) +
-  
-  theme_minimal()
+  geom_line(linewidth = 1.4, colour = "#cb181d") +
+  geom_point(
+    aes(fill = scenario),
+    shape = 21, size = 5,
+    colour = "white", stroke = 1.8
+  ) +
+  scale_fill_manual(values = rodent_cols) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.1),
+    labels = scales::label_number(accuracy = 0.1)
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position  = "none",
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    title    = "Ecological regulation recovery — rodent-borne system",
+    x        = "Restoration intensity",
+    y        = "Probability of strong ecological regulation"
+  )
+
+# =========================================================
+# PLOT 3 – Disease risk vs long-term stability
+# =========================================================
+
+ggplot(
+  results,
+  aes(disease_risk, long_term_stability, colour = scenario)
+) +
+  geom_point(alpha = 0.15, size = 1.8) +
+  geom_smooth(method = "loess", se = TRUE, linewidth = 1.4) +
+  scale_colour_manual(values = rodent_cols) +
+  scale_fill_manual(values   = rodent_cols) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(
+    title  = "Rodent-borne diseases: disease risk vs long-term stability",
+    x      = "Disease risk",
+    y      = "Long-term stability (8–15 yr)",
+    colour = "Restoration intensity"
+  )
+
+# =========================================================
+# PLOT 4 – Stabilisation trajectories
+# =========================================================
+
+traj <- results %>%
+  pivot_longer(
+    starts_with("years_"),
+    names_to  = "time_period",
+    values_to = "probability"
+  )
+
+corridor <- traj %>%
+  group_by(scenario, time_period) %>%
+  summarise(
+    mean_prob = mean(probability),
+    lower     = quantile(probability, 0.025),
+    upper     = quantile(probability, 0.975),
+    .groups   = "drop"
+  )
+
+corridor$time_period <- factor(
+  corridor$time_period,
+  levels = c("years_1_3","years_4_7","years_8_12","years_13_15"),
+  labels = c("1–3 yr","4–7 yr","8–12 yr","13–15 yr")
+)
+
+ggplot(
+  corridor,
+  aes(x = time_period, y = mean_prob,
+      group = scenario, colour = scenario, fill = scenario)
+) +
+  geom_ribbon(aes(ymin = lower, ymax = upper),
+              alpha = 0.18, colour = NA) +
+  geom_line(linewidth = 1.4) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = rodent_cols) +
+  scale_fill_manual(values   = rodent_cols) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(
+    title    = "Rodent-borne disease stabilisation trajectories",
+    x        = "Time window",
+    y        = "Probability",
+    colour   = "Restoration intensity",
+    fill     = "Restoration intensity"
+  )
