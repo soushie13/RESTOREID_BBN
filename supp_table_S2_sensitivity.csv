@@ -1,0 +1,41 @@
+"system","parameter","baseline","risk_low","risk_high","swing","abs_swing"
+"Direct-contact zoonoses","Disease: low amplification → absent",0.489,0.436,0.612,0.176,0.176
+"Direct-contact zoonoses","Disease: high amplification → spillover",0.489,0.44,0.565,0.125,0.125
+"Direct-contact zoonoses","Amplification: mid conditions (ambiguity)",0.489,0.466,0.513,0.047,0.047
+"Direct-contact zoonoses","Amplification: low contact + high diversity → low amp",0.489,0.448,0.491,0.043,0.043
+"Direct-contact zoonoses","Amplification: high contact + low diversity → high amp",0.489,0.498,0.508,0.01,0.01
+"Direct-contact zoonoses","Contact: high rest → low contact (primary mechanism)",0.489,0.489,0.489,0,0
+"Direct-contact zoonoses","Contact: none rest → high contact (baseline)",0.489,0.489,0.489,0,0
+"Direct-contact zoonoses","Contact: disturbance × rest interaction",0.489,0.489,0.489,0,0
+"Direct-contact zoonoses","Regulation: high rest → high reg",0.489,0.489,0.489,0,0
+"Direct-contact zoonoses","Regulation: biodiversity bonus (strength)",0.489,0.489,0.489,0,0
+"Mosquito-borne","Disease: high SW + strong reg → risk (recovery)",0.46,0.429,0.491,0.062,0.062
+"Mosquito-borne","Regulation: moderate rest (transition)",0.46,0.44,0.492,0.052,0.052
+"Mosquito-borne","Disease: mod SW + mod reg → risk (transition)",0.46,0.441,0.477,0.036,0.036
+"Mosquito-borne","Disease: high SW + weak reg → risk (hump peak)",0.46,0.493,0.524,0.031,0.031
+"Mosquito-borne","Standing water: moderate rest → peak SW",0.46,0.465,0.456,-0.009,0.009
+"Mosquito-borne","Hydro recovery: high rest → full recovery",0.46,0.46,0.46,0,0
+"Mosquito-borne","Standing water: none rest (baseline level)",0.46,0.46,0.46,0,0
+"Mosquito-borne","Standing water: low rest → peak SW",0.46,0.46,0.46,0,0
+"Mosquito-borne","Standing water: high rest → low SW (recovery)",0.46,0.46,0.46,0,0
+"Mosquito-borne","Regulation: none rest → weak reg",0.46,0.46,0.46,0,0
+"Rodent-borne","Disease: moderate abundance (transition)",0.502,0.401,0.542,0.141,0.141
+"Rodent-borne","Disease: low abundance → absent",0.502,0.392,0.479,0.087,0.087
+"Rodent-borne","Habitat quality: moderate rest (steepness)",0.502,0.456,0.533,0.078,0.078
+"Rodent-borne","Disease: high abundance → present",0.502,0.563,0.616,0.053,0.053
+"Rodent-borne","Rodent abundance: moderate habitat",0.502,0.485,0.518,0.033,0.033
+"Rodent-borne","Rodent abundance: high habitat → low rodents (dilution)",0.502,0.492,0.523,0.031,0.031
+"Rodent-borne","Rodent abundance: low habitat → high rodents",0.502,0.502,0.506,0.004,0.004
+"Rodent-borne","Habitat quality: none rest → low quality",0.502,0.502,0.502,0,0
+"Rodent-borne","Habitat quality: high rest → high quality",0.502,0.502,0.502,0,0
+"Rodent-borne","Regulation: high rest → strong reg",0.502,0.502,0.502,0,0
+"Tick-borne","Disease: high HC + weak pred → present (hump peak)",0.509,0.627,0.719,0.092,0.092
+"Tick-borne","Predator recovery: low rest → weak (lag strength)",0.509,0.492,0.525,0.033,0.033
+"Tick-borne","Disease: low HC + weak pred (no-rest baseline risk)",0.509,0.499,0.518,0.018,0.018
+"Tick-borne","Host connectivity: low rest → peak connectivity",0.509,0.519,0.501,-0.018,0.018
+"Tick-borne","Disease: high HC + strong pred → present (recovery)",0.509,0.499,0.514,0.015,0.015
+"Tick-borne","Host connectivity: none rest (baseline)",0.509,0.509,0.509,0,0
+"Tick-borne","Host connectivity: high rest → suppressed",0.509,0.509,0.509,0,0
+"Tick-borne","Predator recovery: none rest → weak",0.509,0.509,0.509,0,0
+"Tick-borne","Predator recovery: high rest → strong",0.509,0.509,0.509,0,0
+"Tick-borne","Regulation: strong pred + absent disease → strong",0.509,0.509,0.509,0,0
