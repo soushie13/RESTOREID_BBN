@@ -1,0 +1,41 @@
+"system","parameter","baseline","risk_low","risk_high","swing","abs_swing"
+"Direct-contact zoonoses","Disease: low amplification → absent",0.508,0.515,0.502,-0.013,0.013
+"Direct-contact zoonoses","Amplification: mid conditions (ambiguous)",0.508,0.499,0.511,0.012,0.012
+"Direct-contact zoonoses","Disease: high amplification → present",0.508,0.504,0.511,0.007,0.007
+"Direct-contact zoonoses","Amplification: low contact + high div → low amp",0.508,0.51,0.506,-0.004,0.004
+"Direct-contact zoonoses","Amplification: high contact + low div → high amp",0.508,0.537,0.539,0.003,0.003
+"Direct-contact zoonoses","Contact: high rest → low contact",0.508,0.508,0.508,0,0
+"Direct-contact zoonoses","Contact: none → high contact",0.508,0.508,0.508,0,0
+"Direct-contact zoonoses","Contact: disturbance penalty",0.508,0.508,0.508,0,0
+"Direct-contact zoonoses","Regulation: high rest → high reg",0.508,0.508,0.508,0,0
+"Direct-contact zoonoses","Regulation: biodiversity bonus",0.508,0.508,0.508,0,0
+"Mosquito-borne","Disease: high SW + strong reg → present",0.519,0.436,0.473,0.037,0.037
+"Mosquito-borne","Disease: low SW + strong reg → present",0.519,0.5,0.517,0.017,0.017
+"Mosquito-borne","Disease: mod SW + weak reg → present",0.519,0.525,0.527,0.002,0.002
+"Mosquito-borne","Disease: high SW + weak reg → present",0.519,0.522,0.523,0,0
+"Mosquito-borne","Standing water: none → low SW",0.519,0.519,0.519,0,0
+"Mosquito-borne","Standing water: low rest → high SW",0.519,0.519,0.519,0,0
+"Mosquito-borne","Standing water: moderate rest → high SW",0.519,0.519,0.519,0,0
+"Mosquito-borne","Standing water: high rest → low SW",0.519,0.519,0.519,0,0
+"Mosquito-borne","Regulation: high rest → strong",0.519,0.519,0.519,0,0
+"Mosquito-borne","Regulation: none → weak",0.519,0.519,0.519,0,0
+"Rodent-borne","Disease: moderate abundance → present",0.482,0.477,0.487,0.01,0.01
+"Rodent-borne","Rodent abundance: low habitat → high abundance",0.482,0.48,0.484,0.003,0.003
+"Rodent-borne","Rodent abundance: high habitat → low abundance",0.482,0.484,0.481,-0.003,0.003
+"Rodent-borne","Disease: high abundance → present",0.482,0.481,0.483,0.003,0.003
+"Rodent-borne","Disease: low abundance → absent",0.482,0.483,0.481,-0.002,0.002
+"Rodent-borne","Rodent abundance: moderate habitat → moderate",0.482,0.482,0.482,0,0
+"Rodent-borne","Regulation: disease penalty",0.482,0.482,0.482,0,0
+"Rodent-borne","Habitat: none → low quality",0.482,0.482,0.482,0,0
+"Rodent-borne","Habitat: high rest → high quality",0.482,0.482,0.482,0,0
+"Rodent-borne","Habitat: moderate rest → high quality",0.482,0.482,0.482,0,0
+"Tick-borne","Predator: low → weak (lag persists)",0.698,0.695,0.702,0.007,0.007
+"Tick-borne","Disease: high HC + strong pred → present",0.698,0.694,0.696,0.002,0.002
+"Tick-borne","Disease: high HC + weak pred → present (peak)",0.698,0.709,0.71,0.001,0.001
+"Tick-borne","Disease: low HC + weak pred (baseline)",0.698,0.699,0.699,0,0
+"Tick-borne","Connectivity: low rest → high HC (peak)",0.698,0.698,0.698,0,0
+"Tick-borne","Connectivity: none → low HC",0.698,0.698,0.698,0,0
+"Tick-borne","Connectivity: high rest → high HC",0.698,0.698,0.698,0,0
+"Tick-borne","Predator: none → weak (lag)",0.698,0.698,0.698,0,0
+"Tick-borne","Predator: high → strong",0.698,0.698,0.698,0,0
+"Tick-borne","Regulation: high rest → strong",0.698,0.698,0.698,0,0

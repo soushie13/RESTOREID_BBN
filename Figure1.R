@@ -1,5 +1,5 @@
 # =========================================================
-# COMPARATIVE FIGURE — FOUR DISEASE SYSTEMS
+# COMPARATIVE FIGURE 1 — FOUR DISEASE SYSTEMS
 # Requires: ggplot2, patchwork, scales
 install.packages("patchwork")
 # =========================================================
